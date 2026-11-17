@@ -15,6 +15,8 @@ SvelteKit (Svelte 5, client-only SPA) + Firebase (Auth, Firestore, Cloud Functio
 | `/attendance` | members | Year heatmap + session list. Holders of `attendance` can search any member. |
 | `/schedule` | members | Monthly calendar and calendar (ICS) subscription. |
 | `/sessions` | `attendance` permission | Club settings, session management, QR codes (PDF/PNG), attendance viewer, manual marking. |
+| `/announcements` | members | Announcement list (title and published time); tapping one opens its content. |
+| `/announcements/admin` | `announcement` permission | Add, edit and remove announcements, written in markdown with a preview. |
 | `/profile` | members | Your own name, second email and phone. |
 | `/users` | `profile` or `admin` permission | Member list with search; open a member to edit their details. Holders of `admin` also tick that member's permissions there. |
 
@@ -34,6 +36,7 @@ The check-in window opens 30 minutes before training and closes at the end of th
 
 ```
 user/{uid}                              { name, email, email2?, phone?, permissions[] }
+announcement/{autoId}                   { title, content (markdown), publishedAt, updatedAt?, author }
 config/attendance                       { windowMode: 'day' | 'week', schedule: { <weekday 0-6>: { start, end } } }
 session/{YYYY-MM-DD-Ddd}                { start, end, trainingStart, trainingEnd, type, label, color, location }
 sessionSecret/{sessionId}               { passcode }
@@ -49,6 +52,7 @@ attendance/{uid}/sessions/{sessionId}   { t, scannedAt, submittedAt }   (manual 
 | `admin` | Admin | Grant and remove any permission, including `admin`, and edit member details. Grants nothing else by itself. |
 | `profile` | Users | View the member list and edit names, second emails and phones. |
 | `attendance` | Sessions | Manage sessions, QR codes, club settings and attendance. |
+| `announcement` | Announcements | Publish, edit and remove announcements. |
 
 Members can edit their own name, second email and phone, never their own permissions. An admin can't untick their own Admin in the app. A permission change reaches the affected person the next time they open or reload the app. The list lives in `PERMISSIONS` in `src/lib/club.js` and is enforced in `firestore.rules`.
 

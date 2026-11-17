@@ -14,10 +14,12 @@
 	"dependencies": {
 		"@mdi/js": "^7.4.47",
 		"ace.svelte": "^0.2.0",
+		"dompurify": "^3.4.18",
 		"firebase": "^13.4.0",
 		"idb-keyval": "^6.3.0",
 		"jspdf": "^4.2.1",
 		"jsqr": "^1.4.0",
+		"marked": "^18.2.1",
 		"qrcode": "^1.5.4",
 		"sweetalert2": "^11.26.25"
 	},

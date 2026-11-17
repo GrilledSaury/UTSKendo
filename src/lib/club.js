@@ -20,6 +20,7 @@ export const PERMISSIONS = [
   { key: 'admin',      label: 'Admin',    desc: 'Grant and remove permissions, including Admin' },
   { key: 'profile',    label: 'Users',    desc: 'View all members and edit their details' },
   { key: 'attendance', label: 'Sessions', desc: 'Manage sessions, QR codes and attendance' },
+  { key: 'announcement', label: 'Announcements', desc: 'Publish, edit and remove announcements' },
 ]
 
 export const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -68,6 +69,10 @@ export function fmtDate(d) {
 }
 export function fmtShortDate(d) {
   return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+// e.g. "17 Nov 2026, 6:45 pm"
+export function fmtDateTime(d) {
+  return d.toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 export function fmtTime(d) {
   return d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })
