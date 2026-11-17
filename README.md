@@ -15,7 +15,7 @@ SvelteKit (Svelte 5, client-only SPA) + Firebase (Auth, Firestore, Cloud Functio
 | `/attendance` | members | Year heatmap + session list. Holders of `attendance` can search any member. |
 | `/schedule` | members | Monthly calendar and calendar (ICS) subscription. |
 | `/sessions` | `attendance` permission | Club settings, session management, QR codes (PDF/PNG), attendance viewer, manual marking. |
-| `/announcements` | members | Announcement list (title and published time); tapping one opens its content. |
+| `/announcements` | members | Unviewed and Viewed tabs listing title and published time; tapping one opens its content and moves it to Viewed. The home tile shows "NEW" while anything is unviewed. |
 | `/announcements/admin` | `announcement` permission | Add, edit and remove announcements, written in markdown with a preview. |
 | `/profile` | members | Your own name, second email and phone. |
 | `/users` | `profile` or `admin` permission | Member list with search; open a member to edit their details. Holders of `admin` also tick that member's permissions there. |
@@ -35,7 +35,7 @@ The check-in window opens 30 minutes before training and closes at the end of th
 ### Data model
 
 ```
-user/{uid}                              { name, email, email2?, phone?, permissions[] }
+user/{uid}                              { name, email, email2?, phone?, permissions[], viewedAnnouncements[]? }
 announcement/{autoId}                   { title, content (markdown), publishedAt, updatedAt?, author }
 config/attendance                       { windowMode: 'day' | 'week', schedule: { <weekday 0-6>: { start, end } } }
 session/{YYYY-MM-DD-Ddd}                { start, end, trainingStart, trainingEnd, type, label, color, location }
@@ -44,6 +44,12 @@ attendance/{uid}/sessions/{sessionId}   { t, scannedAt, submittedAt }   (manual 
 ```
 
 `session.start` / `session.end` are the check-in window; `trainingStart` / `trainingEnd` are the actual training times. Events (`type: 'event'`) appear on the schedule only and have no passcode.
+
+### Announcements
+
+- An announcement is shown for **2 months** after it's published. The `deleteExpiredAnnouncements` Cloud Function deletes expired ones every day at 3 am Sydney time; the app hides them from the moment they expire, so the daily timing doesn't matter. The length is `ANNOUNCEMENT_MONTHS` in `src/lib/announcements.js` and `functions/index.js`.
+- `viewedAnnouncements` on a member's user doc holds the ids they've opened, so viewed/unviewed follows them across devices. When the app loads the list from the server, ids whose announcement no longer exists are removed from it.
+- Scheduled functions need the Blaze plan (already required for the other functions); the first deploy enables Cloud Scheduler.
 
 ### Permissions
 

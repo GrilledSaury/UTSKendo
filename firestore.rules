@@ -23,9 +23,14 @@ service cloud.firestore {
                     && request.resource.data.permissions is list
                     && request.resource.data.permissions.size() == 0;
       // Contact details: the member themselves, or anyone with 'profile'.
+      // viewedAnnouncements (ids of announcements opened): the member only.
       // Permissions: only 'admin' — which can grant anything, including 'admin'.
-      allow update: if (changesOnly(['name', 'phone', 'email2'])
-                        && (request.auth.uid == userId || hasPermission('profile')))
+      allow update: if (request.auth.uid == userId
+                        && changesOnly(['name', 'phone', 'email2', 'viewedAnnouncements'])
+                        && (!('viewedAnnouncements' in request.resource.data)
+                            || (request.resource.data.viewedAnnouncements is list
+                                && request.resource.data.viewedAnnouncements.size() <= 1000)))
+                    || (hasPermission('profile') && changesOnly(['name', 'phone', 'email2']))
                     || (hasPermission('admin')
                         && changesOnly(['name', 'phone', 'email2', 'permissions'])
                         && request.resource.data.permissions is list);

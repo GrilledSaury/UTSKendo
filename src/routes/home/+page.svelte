@@ -4,13 +4,15 @@
   import { goto } from '$app/navigation'
   import { signOut } from 'firebase/auth'
   import Swal from 'sweetalert2'
+  import { onMount } from 'svelte'
   import { auth } from '$lib/firebase'
   import { userProfile } from '$lib/stores'
+  import { fetchAnnouncements, syncViewed } from '$lib/announcements'
   import { pending, online } from '$lib/sync'
 
   // Apps visible to everyone
   const baseApps = [
-    { label: 'Announcements', icon: mdiBullhorn, color: 'text-orange-500', href: '/announcements' },
+    { label: 'Announcements', icon: mdiBullhorn, color: 'text-orange-500', href: '/announcements', badge: 'announcements' },
     { label: 'My Attendance', icon: mdiCalendarMonth, color: 'text-green-500', href: '/attendance' },
     { label: 'Schedule', icon: mdiCalendarBlank, color: 'text-teal-500', href: '/schedule' },
     { label: 'My Profile', icon: mdiAccount, color: 'text-blue-500', href: '/profile' },
@@ -27,6 +29,32 @@
     ...baseApps,
     ...permissionApps.filter(a => a.permissions.some(p => $userProfile.permissions?.includes(p))),
   ])
+
+  // "new" on the Announcements tile: a live announcement this member hasn't opened.
+  // viewedAnnouncements lives on their user doc, so it follows them across devices.
+  let liveIds = $state([])
+  let hasNewAnnouncement = $derived.by(() => {
+    const viewed = new Set($userProfile.viewedAnnouncements ?? [])
+    return liveIds.some(id => !viewed.has(id))
+  })
+
+  async function checkAnnouncements() {
+    try {
+      // From Firestore's local cache when offline
+      const { items, fromServer } = await fetchAnnouncements()
+      await syncViewed(items, fromServer)
+      liveIds = items.map(a => a.id)
+    } catch { /* offline with nothing cached: no label */ }
+  }
+
+  // Checked when home opens, and again whenever the app comes back to the foreground
+  // (an installed PWA can sit on this page for days without reloading)
+  onMount(() => {
+    checkAnnouncements()
+    const onVisible = () => { if (document.visibilityState === 'visible') checkAnnouncements() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  })
 
   async function logout() {
     if ($pending.length > 0) {
@@ -84,6 +112,9 @@
       >
         <AIcon path={app.icon} class="{app.color} mr-3 sm:mr-1"/>
         {app.label}
+        {#if app.badge === 'announcements' && hasNewAnnouncement}
+          <span class="ml-2 text-xs font-bold uppercase text-red-500">new</span>
+        {/if}
       </button>
     {/each}
   </div>

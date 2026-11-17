@@ -1,4 +1,5 @@
 const { onCall, onRequest, HttpsError }       = require('firebase-functions/v2/https')
+const { onSchedule }                          = require('firebase-functions/v2/scheduler')
 const { initializeApp }                       = require('firebase-admin/app')
 const { getFirestore, Timestamp, FieldValue } = require('firebase-admin/firestore')
 
@@ -145,3 +146,40 @@ exports.calendarIcs = onRequest({ cors: true }, async (_req, res) => {
     res.status(500).send('Error generating calendar')
   }
 })
+
+
+// ── Announcements ────────────────────────────────────────────────────────────
+//
+// An announcement is shown for ANNOUNCEMENT_MONTHS after publishing (the app filters
+// by the same cutoff), then deleted here once a day. Members' viewedAnnouncements
+// entries for deleted ones are pruned by the app the next time it loads the list.
+
+// Keep in sync with ANNOUNCEMENT_MONTHS in src/lib/announcements.js
+const ANNOUNCEMENT_MONTHS = 2
+
+async function deleteExpired(now = new Date()) {
+  const cutoff = new Date(now)
+  cutoff.setMonth(cutoff.getMonth() - ANNOUNCEMENT_MONTHS)
+  const db = getFirestore()
+  let deleted = 0
+  // Batches of 400 stay under Firestore's 500-writes-per-batch limit
+  for (;;) {
+    const snap = await db.collection('announcement')
+      .where('publishedAt', '<', Timestamp.fromDate(cutoff))
+      .limit(400).get()
+    if (snap.empty) break
+    const batch = db.batch()
+    snap.docs.forEach(d => batch.delete(d.ref))
+    await batch.commit()
+    deleted += snap.size
+  }
+  return deleted
+}
+
+exports.deleteExpiredAnnouncements = onSchedule(
+  { schedule: 'every day 03:00', timeZone: 'Australia/Sydney' },
+  async () => {
+    const n = await deleteExpired()
+    console.log(`Deleted ${n} expired announcement(s)`)
+  },
+)

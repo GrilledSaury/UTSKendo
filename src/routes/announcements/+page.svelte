@@ -1,13 +1,12 @@
 <script>
   import { onMount } from 'svelte'
-  import { collection, getDocs, orderBy, query } from 'firebase/firestore'
   import { goto } from '$app/navigation'
   import { AIcon } from 'ace.svelte'
   import { mdiHome, mdiChevronRight, mdiClose, mdiPencil, mdiBullhorn } from '@mdi/js'
-  import { db } from '$lib/firebase'
   import { userProfile } from '$lib/stores'
   import { online } from '$lib/sync'
   import { fmtDateTime } from '$lib/club'
+  import { fetchAnnouncements, markViewed, syncViewed } from '$lib/announcements'
   import Markdown from '$lib/components/Markdown.svelte'
 
   const canManage = $userProfile.permissions?.includes('announcement')
@@ -15,16 +14,26 @@
   let items   = $state([])
   let loading = $state(true)
   let error   = $state('')
-  let open    = $state(null)   // the announcement shown in the modal
+  let open    = $state(null)       // the announcement shown in the modal
+  let tab     = $state('unviewed') // 'unviewed' | 'viewed'
+
+  let viewed        = $derived(new Set($userProfile.viewedAnnouncements ?? []))
+  let unviewedItems = $derived(items.filter(a => !viewed.has(a.id)))
+  let viewedItems   = $derived(items.filter(a => viewed.has(a.id)))
+  let shown         = $derived(tab === 'unviewed' ? unviewedItems : viewedItems)
+
+  function show(a) {
+    open = a
+    markViewed(a.id)   // moves it to the Viewed tab
+  }
 
   onMount(async () => {
     try {
       // Offline, this is answered from Firestore's local cache (whatever was last seen)
-      const snap = await getDocs(query(collection(db, 'announcement'), orderBy('publishedAt', 'desc')))
-      items = snap.docs.map(d => {
-        const data = d.data({ serverTimestamps: 'estimate' })
-        return { id: d.id, title: data.title ?? '', content: data.content ?? '', publishedAt: data.publishedAt?.toDate() ?? null }
-      })
+      const { items: list, fromServer } = await fetchAnnouncements()
+      items = list
+      await syncViewed(list, fromServer)
+      if (unviewedItems.length === 0 && viewedItems.length > 0) tab = 'viewed'
     } catch (err) {
       error = $online ? err.message : 'You are offline — announcements will load when you reconnect.'
     }
@@ -52,10 +61,28 @@
   {:else if error}
     <div class="text-red-500">{error}</div>
   {:else}
-    {#each items as a (a.id)}
+    <div class="flex border-b border-gray-300 mb-2 sm:max-w-2xl" role="tablist">
+      <button
+        role="tab" aria-selected={tab === 'unviewed'}
+        class="px-4 py-2 font-semibold border-b-2 -mb-px flex items-center gap-2 {tab === 'unviewed' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}"
+        onclick={() => tab = 'unviewed'}
+      >
+        Unviewed
+        {#if unviewedItems.length}
+          <span class="text-xs font-bold rounded-full px-2 py-0.5 bg-red-500 text-white">{unviewedItems.length}</span>
+        {/if}
+      </button>
+      <button
+        role="tab" aria-selected={tab === 'viewed'}
+        class="px-4 py-2 font-semibold border-b-2 -mb-px {tab === 'viewed' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}"
+        onclick={() => tab = 'viewed'}
+      >Viewed</button>
+    </div>
+
+    {#each shown as a (a.id)}
       <button
         class="w-full text-left px-4 py-3 bg-white shadow rounded my-2 flex items-center gap-3 sm:max-w-2xl"
-        onclick={() => open = a}
+        onclick={() => show(a)}
       >
         <AIcon path={mdiBullhorn} class="text-orange-500 shrink-0" />
         <div class="min-w-0 grow">
@@ -65,7 +92,13 @@
         <AIcon path={mdiChevronRight} class="text-gray-400 shrink-0" />
       </button>
     {:else}
-      <div class="text-gray-400">No announcements yet.</div>
+      <div class="text-gray-400 py-2">
+        {#if tab === 'unviewed'}
+          {items.length ? "You're all caught up." : 'No announcements yet.'}
+        {:else}
+          Announcements you open will appear here.
+        {/if}
+      </div>
     {/each}
   {/if}
 </div>

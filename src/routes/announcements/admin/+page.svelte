@@ -1,13 +1,14 @@
 <script>
   import { onMount } from 'svelte'
   import {
-    addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, serverTimestamp, updateDoc,
+    addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc,
   } from 'firebase/firestore'
   import { goto } from '$app/navigation'
   import Swal from 'sweetalert2'
   import { AIcon } from 'ace.svelte'
   import { mdiArrowLeft, mdiPlus, mdiPencil, mdiDelete, mdiBullhorn } from '@mdi/js'
   import { db } from '$lib/firebase'
+  import { fetchAnnouncements, announcementExpiry, ANNOUNCEMENT_MONTHS } from '$lib/announcements'
   import { userProfile } from '$lib/stores'
   import { online } from '$lib/sync'
   import { fmtDateTime } from '$lib/club'
@@ -26,17 +27,7 @@
 
   async function load() {
     try {
-      const snap = await getDocs(query(collection(db, 'announcement'), orderBy('publishedAt', 'desc')))
-      items = snap.docs.map(d => {
-        const data = d.data({ serverTimestamps: 'estimate' })
-        return {
-          id: d.id,
-          title: data.title ?? '',
-          content: data.content ?? '',
-          publishedAt: data.publishedAt?.toDate() ?? null,
-          updatedAt: data.updatedAt?.toDate() ?? null,
-        }
-      })
+      items = (await fetchAnnouncements()).items
       error = ''
     } catch (err) {
       error = $online ? err.message : 'You are offline — reconnect to manage announcements.'
@@ -137,6 +128,9 @@
           <div class="text-xs text-gray-500 mt-0.5">
             {a.publishedAt ? fmtDateTime(a.publishedAt) : ''}{a.updatedAt ? ` · edited ${fmtDateTime(a.updatedAt)}` : ''}
           </div>
+          {#if a.publishedAt}
+            <div class="text-xs text-gray-400">Removed automatically {fmtDateTime(announcementExpiry(a.publishedAt))}</div>
+          {/if}
         </div>
         <button class="p-2 text-blue-500 shrink-0" onclick={() => openEditor(a)} title="Edit" aria-label="Edit"><AIcon path={mdiPencil} /></button>
         <button class="p-2 text-red-500 shrink-0" onclick={() => remove(a)} title="Remove" aria-label="Remove"><AIcon path={mdiDelete} /></button>
