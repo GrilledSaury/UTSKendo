@@ -319,7 +319,7 @@
               <div class="text-xs text-gray-400">{fmtTime(s.trainingStart)} – {fmtTime(s.trainingEnd)}</div>
             </div>
             {#if s.attended && s.checkinTime}
-              <div class="text-xs text-gray-400 shrink-0">checked in {checkinLabel(s)}</div>
+              <div class="text-xs text-gray-400 shrink-0" title="Checked in {checkinLabel(s)}">{fmtTime(s.checkinTime)}</div>
             {:else if isPending}
               <button class="text-xs text-amber-600 font-semibold shrink-0" onclick={() => goto('/pending')}>pending</button>
             {:else if !s.attended}
