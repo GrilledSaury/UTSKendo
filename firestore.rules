@@ -15,14 +15,14 @@ service cloud.firestore {
     match /user/{userId} {
       // 'attendance' needs the member list for the attendance viewer and member search
       allow read: if request.auth.uid == userId
-                  || hasPermission('profile')
+                  || hasPermission('users')
                   || hasPermission('attendance')
                   || hasPermission('admin');
       // A new user may only create their own profile, with no permissions
       allow create: if request.auth.uid == userId
                     && request.resource.data.permissions is list
                     && request.resource.data.permissions.size() == 0;
-      // Contact details: the member themselves, or anyone with 'profile'.
+      // Contact details: the member themselves, or anyone with 'users'.
       // viewedAnnouncements (ids of announcements opened): the member only.
       // Permissions: only 'admin' — which can grant anything, including 'admin'.
       allow update: if (request.auth.uid == userId
@@ -30,10 +30,22 @@ service cloud.firestore {
                         && (!('viewedAnnouncements' in request.resource.data)
                             || (request.resource.data.viewedAnnouncements is list
                                 && request.resource.data.viewedAnnouncements.size() <= 1000)))
-                    || (hasPermission('profile') && changesOnly(['name', 'phone', 'email2']))
+                    || (hasPermission('users') && changesOnly(['name', 'phone', 'email2']))
                     || (hasPermission('admin')
                         && changesOnly(['name', 'phone', 'email2', 'permissions'])
                         && request.resource.data.permissions is list);
+    }
+
+    // Membership expiry per member, managed by 'users'.
+    // 'attendance' reads it for session attendance rates.
+    match /membership/{userId} {
+      allow read: if request.auth.uid == userId
+                  || hasPermission('users')
+                  || hasPermission('admin')
+                  || hasPermission('attendance');
+      allow create, update: if hasPermission('users')
+                            && request.resource.data.expiresAt is timestamp;
+      allow delete: if hasPermission('users');
     }
 
     // Everyone signed in reads announcements; 'announcement' publishes, edits and removes them

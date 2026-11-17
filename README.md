@@ -18,7 +18,7 @@ SvelteKit (Svelte 5, client-only SPA) + Firebase (Auth, Firestore, Cloud Functio
 | `/announcements` | members | Unviewed and Viewed tabs listing title and published time; tapping one opens its content and moves it to Viewed. The home tile shows "NEW" while anything is unviewed. |
 | `/announcements/admin` | `announcement` permission | Add, edit and remove announcements, written in markdown with a preview. |
 | `/profile` | members | Your own name, second email and phone. |
-| `/users` | `profile` or `admin` permission | Member list with search; open a member to edit their details. Holders of `admin` also tick that member's permissions there. |
+| `/users` | `users` or `admin` permission | Member list with search; open a member to edit their details and membership. Holders of `admin` also tick that member's permissions there. |
 
 ### How check-in works
 
@@ -36,6 +36,7 @@ The check-in window opens 30 minutes before training and closes at the end of th
 
 ```
 user/{uid}                              { name, email, email2?, phone?, permissions[], viewedAnnouncements[]? }
+membership/{uid}                        { expiresAt, updatedAt }   (no doc = never a member)
 announcement/{autoId}                   { title, content (markdown), publishedAt, updatedAt?, author }
 config/attendance                       { windowMode: 'day' | 'week', schedule: { <weekday 0-6>: { start, end } } }
 session/{YYYY-MM-DD-Ddd}                { start, end, trainingStart, trainingEnd, type, label, color, location }
@@ -44,6 +45,12 @@ attendance/{uid}/sessions/{sessionId}   { t, scannedAt, submittedAt }   (manual 
 ```
 
 `session.start` / `session.end` are the check-in window; `trainingStart` / `trainingEnd` are the actual training times. Events (`type: 'event'`) appear on the schedule only and have no passcode.
+
+### Membership
+
+A member's profile shows their membership: active (with expiry date), expired, or not a member. Holders of `users` set the expiry date there, defaulting to 30 June next year as UNSWKC does. Membership runs to the end of the expiry day. The Users list marks members with a green dot.
+
+In **Sessions → attendance**, the rate counts people whose membership was active **on that session's date**: "k of n members attended" with a percentage. Non-members who checked in are listed and counted separately.
 
 ### Announcements
 
@@ -56,7 +63,7 @@ attendance/{uid}/sessions/{sessionId}   { t, scannedAt, submittedAt }   (manual 
 | Permission | Shown as | Allows |
 |---|---|---|
 | `admin` | Admin | Grant and remove any permission, including `admin`, and edit member details. Grants nothing else by itself. |
-| `profile` | Users | View the member list and edit names, second emails and phones. |
+| `users` | Users | View the member list, edit names, second emails and phones, and set membership expiry dates. |
 | `attendance` | Sessions | Manage sessions, QR codes, club settings and attendance. |
 | `announcement` | Announcements | Publish, edit and remove announcements. |
 
@@ -73,7 +80,7 @@ cd functions && npm i
 2. **Web config** — paste the project's web app config into `src/lib/firebaseConfig.js`.
 3. **Select the project** — `firebase use --add`.
 4. **Deploy** — `npm run deploy` (builds, then deploys rules, functions and hosting).
-5. **Make yourself an admin** — sign in once, then in the Firebase console open `user/{your uid}` and set `permissions` to `["admin", "profile", "attendance"]`. This is only needed for the first admin; after that, permissions are granted in the app under **Users**.
+5. **Make yourself an admin** — sign in once, then in the Firebase console open `user/{your uid}` and set `permissions` to `["admin", "users", "attendance"]`. This is only needed for the first admin; after that, permissions are granted in the app under **Users**.
 6. In the app, open **Sessions → Club settings** and set the training days and the check-in window.
 
 Print QR codes from the deployed site, not from `localhost`: the QR contains the address of the site it was generated on.

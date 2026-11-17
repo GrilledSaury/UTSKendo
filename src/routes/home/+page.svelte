@@ -20,7 +20,7 @@
 
   // Apps shown only when the user holds one of the listed permissions
   const permissionApps = [
-    { permissions: ['profile', 'admin'], label: 'Users', icon: mdiAccountGroup, color: 'text-blue-700', href: '/users' },
+    { permissions: ['users', 'admin'], label: 'Users', icon: mdiAccountGroup, color: 'text-blue-700', href: '/users' },
     { permissions: ['announcement'], label: 'Manage Announcements', icon: mdiBullhornOutline, color: 'text-orange-600', href: '/announcements/admin' },
     { permissions: ['attendance'], label: 'Sessions', icon: mdiCalendarCheck, color: 'text-green-600', href: '/sessions' },
   ]

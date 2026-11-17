@@ -7,10 +7,10 @@
   import { db } from '$lib/firebase'
   import { userProfile } from '$lib/stores'
   import { online } from '$lib/sync'
-  import { PERMISSIONS } from '$lib/club'
+  import { PERMISSIONS, isMemberOn } from '$lib/club'
 
   const myPerms = $userProfile.permissions ?? []
-  const allowed = myPerms.includes('profile') || myPerms.includes('admin')
+  const allowed = ['users', 'admin'].some(p => myPerms.includes(p))
 
   let users   = $state([])
   let loading = $state(true)
@@ -28,7 +28,8 @@
   onMount(async () => {
     if (!allowed) { goto('/home'); return }
     try {
-      const snap = await getDocs(collection(db, 'user'))
+      const [snap, memberSnap] = await Promise.all([getDocs(collection(db, 'user')), getDocs(collection(db, 'membership'))])
+      const members = new Set(memberSnap.docs.filter(d => isMemberOn(d.data())).map(d => d.id))
       users = snap.docs
         .map(d => {
           const data = d.data()
@@ -38,6 +39,7 @@
             email: data.email ?? '',
             phone: data.phone ?? '',
             permissions: Array.isArray(data.permissions) ? data.permissions : [],
+            member: members.has(d.id),
           }
         })
         .sort((a, b) => a.name.localeCompare(b.name))
@@ -72,7 +74,10 @@
         onclick={() => goto('/profile?uid=' + encodeURIComponent(u.uid))}
       >
         <div class="min-w-0 grow">
-          <div class="font-bold truncate">{u.name || '(no name)'}</div>
+          <div class="font-bold truncate flex items-center gap-1.5">
+            <span class="shrink-0 {u.member ? 'text-green-500' : 'text-yellow-400'}" title={u.member ? 'Member' : 'Not a member'}>●</span>
+            <span class="truncate">{u.name || '(no name)'}</span>
+          </div>
           <div class="text-sm text-gray-600 truncate">{u.email}{u.phone ? ', ' + u.phone : ''}</div>
           {#if u.permissions.length}
             <div class="flex flex-wrap gap-1 mt-1">

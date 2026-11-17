@@ -18,10 +18,32 @@ export const DEFAULT_SETTINGS = { windowMode: 'day', schedule: {} }
 // Permissions an admin can grant on the Users page. Keep the keys in sync with firestore.rules.
 export const PERMISSIONS = [
   { key: 'admin',      label: 'Admin',    desc: 'Grant and remove permissions, including Admin' },
-  { key: 'profile',    label: 'Users',    desc: 'View all members and edit their details' },
+  { key: 'users',      label: 'Users',    desc: 'View all members, edit their details and membership' },
   { key: 'attendance', label: 'Sessions', desc: 'Manage sessions, QR codes and attendance' },
   { key: 'announcement', label: 'Announcements', desc: 'Publish, edit and remove announcements' },
 ]
+
+// ── Membership ───────────────────────────────────────────────────────────────
+// membership/{uid} = { expiresAt: Timestamp, updatedAt }. No doc = never a member.
+
+// Suggested expiry for a new membership: 30 June next year (as UNSWKC does)
+export function defaultMembershipExpiry(now = new Date()) {
+  return `${now.getFullYear() + 1}-06-30`
+}
+
+// Member on a given date: membership runs to the end of its expiry day
+export function isMemberOn(membership, date = new Date()) {
+  const exp = membership?.expiresAt?.toDate?.()
+  if (!exp) return false
+  const end = new Date(exp); end.setHours(23, 59, 59, 999)
+  return end >= date
+}
+
+// 'YYYY-MM-DD' from a date input → local midnight of that day
+export function dateInputToDate(s) {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
 
 export const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 export const DAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte'
-  import { doc, getDoc, updateDoc } from 'firebase/firestore'
+  import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, Timestamp, updateDoc } from 'firebase/firestore'
   import { goto } from '$app/navigation'
   import { page } from '$app/state'
   import Swal from 'sweetalert2'
@@ -9,14 +9,15 @@
   import { db } from '$lib/firebase'
   import { userProfile, useProfile } from '$lib/stores'
   import { online } from '$lib/sync'
-  import { PERMISSIONS } from '$lib/club'
+  import { PERMISSIONS, defaultMembershipExpiry, isMemberOn, dateInputToDate } from '$lib/club'
 
   // /profile is your own profile; /profile?uid=… is someone else's (opened from the Users page)
   const profileId = page.url.searchParams.get('uid') || $userProfile.uid
   const isSelf    = profileId === $userProfile.uid
   const myPerms   = $userProfile.permissions ?? []
   const canGrant  = myPerms.includes('admin')
-  const canEdit   = isSelf || canGrant || myPerms.includes('profile')
+  const canEdit   = isSelf || canGrant || myPerms.includes('users')   // name, second email, phone
+  const canEditMembership = myPerms.includes('users')
 
   let loading     = $state(true)
   let saving      = $state(false)
@@ -26,10 +27,21 @@
   let phone       = $state('')
   let permissions = $state([])
 
+  // Membership: null = no record; memberExpiry is the date input's 'YYYY-MM-DD'
+  let membership   = $state(null)
+  let memberExpiry = $state(defaultMembershipExpiry())
+  let savingMember = $state(false)
+
+  const fmtExpiry = m => m?.expiresAt?.toDate().toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+  const toInput = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
   onMount(async () => {
     if (!canEdit) { goto('/home'); return }
     try {
-      const snap = await getDoc(doc(db, 'user', profileId))
+      const [snap, memberSnap] = await Promise.all([
+        getDoc(doc(db, 'user', profileId)),
+        getDoc(doc(db, 'membership', profileId)),
+      ])
       if (!snap.exists()) {
         await Swal.fire('Profile not found', '', 'error')
         goto(isSelf ? '/home' : '/users')
@@ -40,7 +52,13 @@
       email       = d.email ?? ''
       email2      = d.email2 ?? ''
       phone       = d.phone ?? ''
-      permissions = Array.isArray(d.permissions) ? [...d.permissions] : []
+      // 'profile' was renamed 'users': show it as Users, so an admin's next save converts it
+      permissions = [...new Set((Array.isArray(d.permissions) ? d.permissions : []).map(p => p === 'profile' ? 'users' : p))]
+      if (memberSnap.exists()) {
+        membership = memberSnap.data()
+        const exp  = membership.expiresAt?.toDate()
+        if (exp) memberExpiry = toInput(exp)
+      }
       loading     = false
     } catch (err) {
       await Swal.fire('Could not load profile', $online ? err.message : 'You are offline.', 'error')
@@ -50,6 +68,40 @@
 
   function togglePermission(key) {
     permissions = permissions.includes(key) ? permissions.filter(p => p !== key) : [...permissions, key]
+  }
+
+  async function saveMembership() {
+    if (!memberExpiry) return
+    if (!$online) { Swal.fire('You are offline', 'Reconnect and try again.', 'warning'); return }
+    savingMember = true
+    try {
+      const data = { expiresAt: Timestamp.fromDate(dateInputToDate(memberExpiry)), updatedAt: serverTimestamp() }
+      await setDoc(doc(db, 'membership', profileId), data)
+      membership = { expiresAt: data.expiresAt }
+      Swal.fire({ title: 'Membership saved', icon: 'success', timer: 1200, showConfirmButton: false })
+    } catch (err) {
+      Swal.fire('Could not save membership', err.message, 'error')
+    }
+    savingMember = false
+  }
+
+  async function removeMembership() {
+    const { isConfirmed } = await Swal.fire({
+      title: 'Remove membership?',
+      text: 'This deletes the membership record. To record that it lapsed, set an earlier expiry date instead.',
+      confirmButtonText: 'Remove',
+      confirmButtonColor: '#ef4444',
+      showCancelButton: true,
+    })
+    if (!isConfirmed) return
+    if (!$online) { Swal.fire('You are offline', 'Reconnect and try again.', 'warning'); return }
+    try {
+      await deleteDoc(doc(db, 'membership', profileId))
+      membership   = null
+      memberExpiry = defaultMembershipExpiry()
+    } catch (err) {
+      Swal.fire('Could not remove membership', err.message, 'error')
+    }
   }
 
   async function save() {
@@ -85,7 +137,7 @@
     <div class="max-w-xl">
       <label class="block my-3">
         <div class="text-sm text-gray-600 mb-1">Name</div>
-        <input class="w-full px-2 py-1.5 rounded border" bind:value={name} maxlength="80">
+        <input class="w-full px-2 py-1.5 rounded border disabled:bg-gray-50" bind:value={name} maxlength="80" disabled={!canEdit}>
       </label>
       <label class="block my-3">
         <div class="text-sm text-gray-600 mb-1">Email (Google account)</div>
@@ -93,11 +145,11 @@
       </label>
       <label class="block my-3">
         <div class="text-sm text-gray-600 mb-1">Second email</div>
-        <input class="w-full px-2 py-1.5 rounded border" type="email" bind:value={email2} maxlength="120">
+        <input class="w-full px-2 py-1.5 rounded border disabled:bg-gray-50" type="email" bind:value={email2} maxlength="120" disabled={!canEdit}>
       </label>
       <label class="block my-3">
         <div class="text-sm text-gray-600 mb-1">Phone</div>
-        <input class="w-full px-2 py-1.5 rounded border" type="tel" bind:value={phone} maxlength="30">
+        <input class="w-full px-2 py-1.5 rounded border disabled:bg-gray-50" type="tel" bind:value={phone} maxlength="30" disabled={!canEdit}>
       </label>
 
       {#if canGrant}
@@ -123,10 +175,46 @@
         </div>
       {/if}
 
-      <button
-        class="bg-blue-500 font-bold hover:shadow rounded px-4 py-1.5 text-white my-5 disabled:opacity-50"
-        onclick={save} disabled={saving}
-      >{saving ? 'Saving…' : 'Save'}</button>
+      {#if canEdit}
+        <button
+          class="bg-blue-500 font-bold hover:shadow rounded px-4 py-1.5 text-white my-5 disabled:opacity-50"
+          onclick={save} disabled={saving}
+        >{saving ? 'Saving…' : canGrant ? 'Save details & permissions' : 'Save details'}</button>
+      {/if}
+
+      <div class="border-t pt-4 mb-5">
+        <div class="font-bold text-gray-700 mb-2">Membership</div>
+        {#if canEditMembership}
+          <div class="flex items-center gap-3 flex-wrap">
+            <label class="text-sm text-gray-600" for="member-expiry">Expires</label>
+            <input id="member-expiry" type="date" bind:value={memberExpiry} class="border rounded px-2 py-1.5 text-sm">
+            <button
+              class="bg-green-500 text-white font-bold px-3 py-1.5 rounded text-sm disabled:opacity-50"
+              onclick={saveMembership} disabled={!memberExpiry || savingMember}
+            >{savingMember ? 'Saving…' : 'Save membership'}</button>
+            {#if membership}
+              <button class="text-red-400 text-sm hover:underline" onclick={removeMembership}>Remove</button>
+            {/if}
+          </div>
+          {#if membership}
+            <p class="text-xs mt-1 {isMemberOn(membership) ? 'text-green-600' : 'text-red-400'}">
+              {isMemberOn(membership) ? 'Active' : 'Expired'} — expires {fmtExpiry(membership)}
+            </p>
+          {:else}
+            <p class="text-xs text-gray-400 mt-1">No membership on record.</p>
+          {/if}
+        {:else}
+          <span class="inline-block px-3 py-1 rounded text-sm font-semibold {isMemberOn(membership) ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}">
+            {#if isMemberOn(membership)}
+              Active — expires {fmtExpiry(membership)}
+            {:else if membership}
+              Expired {fmtExpiry(membership)}
+            {:else}
+              Not a member
+            {/if}
+          </span>
+        {/if}
+      </div>
 
       <div class="text-gray-400 font-mono text-xs break-all">ID: {profileId}</div>
     </div>

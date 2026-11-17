@@ -18,7 +18,7 @@
   import { jsPDF } from 'jspdf'
   import {
     CLUB_NAME, DEFAULT_LOCATION, DEFAULT_SETTINGS, OPEN_BEFORE_MINS, DAY_FULL, COLORS, COLORS_MAP,
-    labelTw, dateKey, sessionIdFor, checkinWindow, fmtDate, fmtShortDate, fmtTime,
+    labelTw, dateKey, sessionIdFor, checkinWindow, fmtDate, fmtShortDate, fmtTime, isMemberOn,
   } from '$lib/club'
   import { buildScanUrl } from '$lib/qr'
 
@@ -396,7 +396,9 @@
     viewLoading = true
     viewModal   = { session, rows: [] }
     try {
-      const usersSnap = await getDocs(collection(db, 'user'))
+      const [usersSnap, memberSnap] = await Promise.all([getDocs(collection(db, 'user')), getDocs(collection(db, 'membership'))])
+      // Member = membership active on the day of this session (not today)
+      const members = new Set(memberSnap.docs.filter(d => isMemberOn(d.data(), session.trainingStart)).map(d => d.id))
       const rows = await Promise.all(usersSnap.docs.map(async u => {
         const snap = await getDoc(doc(db, 'attendance', u.id, 'sessions', session.id))
         const data = snap.data()
@@ -406,6 +408,7 @@
           uid:       u.id,
           name:      u.data().name ?? '',
           checkedIn: snap.exists(),
+          member:    members.has(u.id),
           time,
           manual:    data?.p === 'manual',
           late:      time && submitted && submitted - time > LATE_SYNC_MS ? submitted : null,
@@ -707,8 +710,24 @@
       {#if viewLoading}
         <div class="p-8 text-center text-gray-400">Loading...</div>
       {:else}
-        <div class="px-4 py-2 text-sm text-gray-500 border-b">
-          {viewModal.rows.filter(r => r.checkedIn).length} / {viewModal.rows.length} checked in
+        {@const memberRows = viewModal.rows.filter(r => r.member)}
+        {@const memberIn   = memberRows.filter(r => r.checkedIn).length}
+        {@const othersIn   = viewModal.rows.filter(r => r.checkedIn && !r.member).length}
+        <div class="px-4 py-3 border-b">
+          {#if memberRows.length}
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold">{Math.round(memberIn / memberRows.length * 100)}%</span>
+              <span class="text-sm text-gray-600">{memberIn} of {memberRows.length} members attended</span>
+            </div>
+            <div class="h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
+              <div class="h-full bg-green-500 rounded-full" style="width: {memberIn / memberRows.length * 100}%"></div>
+            </div>
+          {:else}
+            <div class="text-sm text-gray-500">No members on record for this date.</div>
+          {/if}
+          <div class="text-xs text-gray-400 mt-1.5">
+            {othersIn} non-member{othersIn === 1 ? '' : 's'} attended · {viewModal.rows.filter(r => r.checkedIn).length} checked in total
+          </div>
         </div>
         <div class="overflow-y-auto grow">
           {#each viewModal.rows as row (row.uid)}
@@ -722,7 +741,10 @@
                   <AIcon path={mdiCheck} size="16px" class="text-green-500" />
                 {/if}
               </button>
-              <div class="grow font-medium text-sm">{row.name}</div>
+              <div class="grow font-medium text-sm flex items-center gap-1.5 min-w-0">
+                <span class="shrink-0 text-xs {row.member ? 'text-green-500' : 'text-yellow-400'}" title={row.member ? 'Member on this date' : 'Not a member on this date'}>●</span>
+                <span class="truncate">{row.name}</span>
+              </div>
               {#if row.time}
                 <div class="text-xs text-gray-400 shrink-0 text-right">
                   {checkinLabel(row.time, viewModal.session)}
