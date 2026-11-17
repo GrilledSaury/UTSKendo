@@ -1,0 +1,86 @@
+<script>
+  import { mdiLogout, mdiCalendarCheck, mdiCalendarMonth, mdiCalendarBlank, mdiQrcodeScan, mdiCloudUploadOutline, mdiChevronRight, mdiWifiOff } from '@mdi/js'
+  import { AIcon } from 'ace.svelte'
+  import { goto } from '$app/navigation'
+  import { signOut } from 'firebase/auth'
+  import Swal from 'sweetalert2'
+  import { auth } from '$lib/firebase'
+  import { userProfile } from '$lib/stores'
+  import { pending, online } from '$lib/sync'
+
+  // Apps visible to everyone
+  const baseApps = [
+    { label: 'My Attendance', icon: mdiCalendarMonth, color: 'text-green-500', href: '/attendance' },
+    { label: 'Schedule', icon: mdiCalendarBlank, color: 'text-teal-500', href: '/schedule' },
+  ]
+
+  // Apps shown only when user has the matching permission
+  const permissionApps = [
+    { permission: 'attendance', label: 'Sessions', icon: mdiCalendarCheck, color: 'text-green-600', href: '/sessions' },
+  ]
+
+  let apps = $derived([
+    ...baseApps,
+    ...permissionApps.filter(a => $userProfile.permissions?.includes(a.permission)),
+  ])
+
+  async function logout() {
+    if ($pending.length > 0) {
+      const { isConfirmed } = await Swal.fire({
+        title: 'Sign out?',
+        text: `You have ${$pending.length} check-in${$pending.length === 1 ? '' : 's'} that haven't been submitted yet. They stay on this phone and will be submitted the next time you sign in here.`,
+        confirmButtonText: 'Sign out',
+        confirmButtonColor: '#ef4444',
+        showCancelButton: true,
+      })
+      if (!isConfirmed) return
+    }
+    await signOut(auth)  // the root layout redirects to the sign-in page
+  }
+</script>
+
+<div class="min-h-screen w-screen bg-gray-100 flex flex-col p-3 sm:p-10">
+  <div class="flex items-center mb-4">
+    <h1 class="text-gray-700 font-bold text-3xl m-3">Welcome, {$userProfile.name}</h1>
+    <div class="grow"></div>
+    {#if !$online}
+      <span class="flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-200 rounded-full px-2 py-1 mr-2">
+        <AIcon path={mdiWifiOff} size="14px" />Offline
+      </span>
+    {/if}
+    <button onclick={logout} title="Sign out"><AIcon class="text-red-500" path={mdiLogout}></AIcon></button>
+  </div>
+
+  {#if $pending.length > 0}
+    <button
+      class="mx-2 mb-3 px-4 py-3 rounded shadow bg-amber-50 border border-amber-200 text-amber-800 flex items-center gap-3 text-left sm:max-w-md"
+      onclick={() => goto('/pending')}
+    >
+      <AIcon path={mdiCloudUploadOutline} class="shrink-0" />
+      <div class="grow">
+        <div class="font-bold">Pending check-ins: {$pending.length}</div>
+        <div class="text-xs">Not submitted yet — tap to review or submit now</div>
+      </div>
+      <AIcon path={mdiChevronRight} class="shrink-0" />
+    </button>
+  {/if}
+
+  <button
+    class="mx-2 mb-3 px-4 py-4 rounded shadow bg-blue-500 text-white font-bold text-lg flex items-center justify-center gap-3 sm:max-w-md"
+    onclick={() => goto('/scan')}
+  >
+    <AIcon path={mdiQrcodeScan} />Scan attendance QR
+  </button>
+
+  <div class="flex flex-wrap items-center">
+    {#each apps as app}
+      <button
+        class="border-2 border-gray-100 m-2 px-3 py-2 rounded shadow bg-white transition-all flex items-center sm:justify-center"
+        onclick={() => goto(app.href)}
+      >
+        <AIcon path={app.icon} class="{app.color} mr-3 sm:mr-1"/>
+        {app.label}
+      </button>
+    {/each}
+  </div>
+</div>

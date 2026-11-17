@@ -1,30 +1,76 @@
-# template-svelte
+# UTSKC Tools
 
-Vite + Svelte + SvelteKit + TailwindCSS + [AceUI](https://ace-ui.pages.dev)
+Club tools for **UTS Kendo Club** — Phase 1 is attendance tracking. Modelled on the UNSWKC tools.
 
-## Get Started
+SvelteKit (Svelte 5, client-only SPA) + Firebase (Auth, Firestore, Cloud Functions, Hosting) + Tailwind CSS v3, installable as a PWA.
 
-Click **Use Template** or this [link](https://github.com/yzITI/template-svelte/generate).
+## What it does
 
-Change project name in  `package.json`
+| Route | Who | What |
+| --- | --- | --- |
+| `/` | everyone | Google sign-in. The `user/{uid}` profile is created on first login. |
+| `/home` | members | App tiles, **Scan attendance QR**, and a "Pending check-ins" banner. |
+| `/scan` | members | Camera QR scanner. Also the landing page when the QR is scanned with the phone's own camera. |
+| `/pending` | members | Check-ins saved on the phone that haven't reached the server, with **Submit now**. |
+| `/attendance` | members | Year heatmap + session list. Admins can search any member. |
+| `/schedule` | members | Monthly calendar and calendar (ICS) subscription. |
+| `/sessions` | `attendance` permission | Club settings, session management, QR codes (PDF/PNG), attendance viewer, manual marking. |
+
+### How check-in works
+
+1. An admin creates sessions and prints the QR book (one A4 page per session).
+2. A member scans the session QR. The QR is self-contained — session id, passcode and the check-in window — so the phone validates the time window **without a network connection**.
+3. The scan is saved to IndexedDB and submitted to the `submitAttendance` Cloud Function straight away.
+4. If the phone is offline, the check-in stays queued and is submitted automatically on reconnect, when the app is re-opened, and on a one-minute timer. Until then it shows as **Pending**.
+5. The function checks the passcode and that the **scan time** (not the submission time) falls inside the session's window, then writes `attendance/{uid}/sessions/{sessionId}`.
+
+The check-in window opens 30 minutes before training and closes at the end of the training day, or at the end of that week (Sunday) — an admin chooses under **Club settings**. The window is fixed when a session is created.
+
+> The scan time comes from the member's phone, so someone who has a session's QR code can claim any scan time inside its window. That is the accepted trade-off for offline check-in.
+
+### Data model
+
 ```
-"name": "project-name"
+user/{uid}                              { name, email, permissions[] }
+config/attendance                       { windowMode: 'day' | 'week', schedule: { <weekday 0-6>: { start, end } } }
+session/{YYYY-MM-DD-Ddd}                { start, end, trainingStart, trainingEnd, type, label, color, location }
+sessionSecret/{sessionId}               { passcode }
+attendance/{uid}/sessions/{sessionId}   { t, scannedAt, submittedAt }   (manual marks: { t, p: 'manual', markedBy })
 ```
 
-Change page title in `src/routes/layout.svelte`
+`session.start` / `session.end` are the check-in window; `trainingStart` / `trainingEnd` are the actual training times. Events (`type: 'event'`) appear on the schedule only and have no passcode.
 
-```html
-<title>Your Page Title</title>
-```
-
-Install dependency
+## Setup
 
 ```
 npm i
+cd functions && npm i
 ```
 
-Run dev server
+1. **Create the Firebase project**, then enable *Authentication → Google*, *Firestore* and *Functions* (Functions needs the Blaze plan).
+2. **Web config** — paste the project's web app config into `src/lib/firebaseConfig.js`.
+3. **Select the project** — `firebase use --add`.
+4. **Deploy** — `npm run deploy` (builds, then deploys rules, functions and hosting).
+5. **Make yourself an admin** — sign in once, then in the Firebase console open `user/{your uid}` and set `permissions` to `["attendance"]`. There is no user-admin page yet, so permissions are granted in the console.
+6. In the app, open **Sessions → Club settings** and set the training days and the check-in window.
+
+Print QR codes from the deployed site, not from `localhost`: the QR contains the address of the site it was generated on.
+
+## Development
 
 ```
-npm run dev
+npm run dev          # against the real Firebase project
 ```
+
+To work without touching real data, run the Firebase emulators (needs Java) and point the app at them:
+
+```
+npm run emulators    # Auth, Firestore and Functions emulators
+npm run dev:emu      # the app, wired to the emulators
+```
+
+The service worker is only active in production builds (`npm run build`).
+
+## Things to confirm with the club
+
+- Training days and times, and end-of-day vs end-of-week check-in — both are set in the app under **Club settings**.

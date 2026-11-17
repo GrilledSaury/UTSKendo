@@ -3,6 +3,7 @@ node_modules
 /build
 /.svelte-kit
 /package
+/dev-dist
 .env
 .env.*
 !.env.example
@@ -11,3 +12,11 @@ vite.config.ts.timestamp-*
 
 package-lock.json
 pnpm-lock.yaml
+
+# Firebase
+.firebase
+*-debug.log
+serviceAccount*.json
+
+# Local reference copy of the UNSWKC codebase (contains its own credentials — never commit)
+/UNSWKC-tools-fe copy/
