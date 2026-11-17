@@ -6,7 +6,7 @@
     "source": "functions"
   },
   "hosting": {
-    "site": "utskendo",
+    "site": "uts-kendo",
     "public": "build",
     "ignore": [
       "firebase.json",
