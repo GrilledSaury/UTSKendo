@@ -12,9 +12,11 @@ SvelteKit (Svelte 5, client-only SPA) + Firebase (Auth, Firestore, Cloud Functio
 | `/home` | members | App tiles, **Scan attendance QR**, and a "Pending check-ins" banner. |
 | `/scan` | members | Camera QR scanner. Also the landing page when the QR is scanned with the phone's own camera. |
 | `/pending` | members | Check-ins saved on the phone that haven't reached the server, with **Submit now**. |
-| `/attendance` | members | Year heatmap + session list. Admins can search any member. |
+| `/attendance` | members | Year heatmap + session list. Holders of `attendance` can search any member. |
 | `/schedule` | members | Monthly calendar and calendar (ICS) subscription. |
 | `/sessions` | `attendance` permission | Club settings, session management, QR codes (PDF/PNG), attendance viewer, manual marking. |
+| `/profile` | members | Your own name, second email and phone. |
+| `/users` | `profile` or `admin` permission | Member list with search; open a member to edit their details. Holders of `admin` also tick that member's permissions there. |
 
 ### How check-in works
 
@@ -31,7 +33,7 @@ The check-in window opens 30 minutes before training and closes at the end of th
 ### Data model
 
 ```
-user/{uid}                              { name, email, permissions[] }
+user/{uid}                              { name, email, email2?, phone?, permissions[] }
 config/attendance                       { windowMode: 'day' | 'week', schedule: { <weekday 0-6>: { start, end } } }
 session/{YYYY-MM-DD-Ddd}                { start, end, trainingStart, trainingEnd, type, label, color, location }
 sessionSecret/{sessionId}               { passcode }
@@ -39,6 +41,16 @@ attendance/{uid}/sessions/{sessionId}   { t, scannedAt, submittedAt }   (manual 
 ```
 
 `session.start` / `session.end` are the check-in window; `trainingStart` / `trainingEnd` are the actual training times. Events (`type: 'event'`) appear on the schedule only and have no passcode.
+
+### Permissions
+
+| Permission | Shown as | Allows |
+|---|---|---|
+| `admin` | Admin | Grant and remove any permission, including `admin`, and edit member details. Grants nothing else by itself. |
+| `profile` | Users | View the member list and edit names, second emails and phones. |
+| `attendance` | Sessions | Manage sessions, QR codes, club settings and attendance. |
+
+Members can edit their own name, second email and phone, never their own permissions. An admin can't untick their own Admin in the app. A permission change reaches the affected person the next time they open or reload the app. The list lives in `PERMISSIONS` in `src/lib/club.js` and is enforced in `firestore.rules`.
 
 ## Setup
 
@@ -51,7 +63,7 @@ cd functions && npm i
 2. **Web config** — paste the project's web app config into `src/lib/firebaseConfig.js`.
 3. **Select the project** — `firebase use --add`.
 4. **Deploy** — `npm run deploy` (builds, then deploys rules, functions and hosting).
-5. **Make yourself an admin** — sign in once, then in the Firebase console open `user/{your uid}` and set `permissions` to `["attendance"]`. There is no user-admin page yet, so permissions are granted in the console.
+5. **Make yourself an admin** — sign in once, then in the Firebase console open `user/{your uid}` and set `permissions` to `["admin", "profile", "attendance"]`. This is only needed for the first admin; after that, permissions are granted in the app under **Users**.
 6. In the app, open **Sessions → Club settings** and set the training days and the check-in window.
 
 Print QR codes from the deployed site, not from `localhost`: the QR contains the address of the site it was generated on.

@@ -7,18 +7,28 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/user/$(request.auth.uid)).data.permissions.hasAny([perm]);
     }
 
+    // True when the write touches nothing outside the listed fields
+    function changesOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
     match /user/{userId} {
-      // Attendance admins need the member list for the attendance viewer and member search
+      // 'attendance' needs the member list for the attendance viewer and member search
       allow read: if request.auth.uid == userId
                   || hasPermission('profile')
-                  || hasPermission('attendance');
+                  || hasPermission('attendance')
+                  || hasPermission('admin');
       // A new user may only create their own profile, with no permissions
       allow create: if request.auth.uid == userId
                     && request.resource.data.permissions is list
                     && request.resource.data.permissions.size() == 0;
-      allow update: if (request.auth.uid == userId
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'email2']))
-                    || hasPermission('profile');
+      // Contact details: the member themselves, or anyone with 'profile'.
+      // Permissions: only 'admin' — which can grant anything, including 'admin'.
+      allow update: if (changesOnly(['name', 'phone', 'email2'])
+                        && (request.auth.uid == userId || hasPermission('profile')))
+                    || (hasPermission('admin')
+                        && changesOnly(['name', 'phone', 'email2', 'permissions'])
+                        && request.resource.data.permissions is list);
     }
 
     // Club attendance settings: weekly training schedule + check-in window length

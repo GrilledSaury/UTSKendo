@@ -7,23 +7,13 @@
   import { goto } from '$app/navigation'
   import { page } from '$app/state'
   import { pwaInfo } from 'virtual:pwa-info'
-  import { userProfile } from '$lib/stores'
+  import { userProfile, readCachedProfile, useProfile } from '$lib/stores'
   import { setSyncUser, startAutoSync } from '$lib/sync'
   import { CLUB_SHORT } from '$lib/club'
 
   let { children } = $props()
 
   let authLoading = $state(true)
-
-  // The profile is mirrored into localStorage so the app can start instantly — and offline
-  const cacheKey = uid => `utskc-profile-${uid}`
-  function readCachedProfile(uid) {
-    try { return JSON.parse(localStorage.getItem(cacheKey(uid))) } catch { return null }
-  }
-  function useProfile(profile) {
-    userProfile.set(profile)
-    try { localStorage.setItem(cacheKey(profile.uid), JSON.stringify(profile)) } catch { /* storage full or blocked */ }
-  }
 
   // Where to go after signing in: only ever a path inside this app
   function returnTo() {

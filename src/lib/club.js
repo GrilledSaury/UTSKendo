@@ -15,6 +15,13 @@ export const OPEN_BEFORE_MINS = 30
 //   schedule:   weekday (0=Sun … 6=Sat) → { start: 'HH:MM', end: 'HH:MM' }, used by "Generate Standard"
 export const DEFAULT_SETTINGS = { windowMode: 'day', schedule: {} }
 
+// Permissions an admin can grant on the Users page. Keep the keys in sync with firestore.rules.
+export const PERMISSIONS = [
+  { key: 'admin',      label: 'Admin',    desc: 'Grant and remove permissions, including Admin' },
+  { key: 'profile',    label: 'Users',    desc: 'View all members and edit their details' },
+  { key: 'attendance', label: 'Sessions', desc: 'Manage sessions, QR codes and attendance' },
+]
+
 export const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 export const DAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
