@@ -1,5 +1,5 @@
 <script>
-  import { mdiLogout, mdiBullhorn, mdiBullhornOutline, mdiAccount, mdiAccountGroup, mdiCalendarCheck, mdiCalendarMonth, mdiCalendarBlank, mdiQrcodeScan, mdiCloudUploadOutline, mdiChevronRight, mdiWifiOff } from '@mdi/js'
+  import { mdiLogout, mdiBullhorn, mdiBullhornOutline, mdiAccount, mdiAccountGroup, mdiCalendarCheck, mdiCalendarMonth, mdiCalendarBlank, mdiQrcodeScan, mdiCloudUploadOutline, mdiChevronRight, mdiWifiOff, mdiHelpCircleOutline } from '@mdi/js'
   import { AIcon } from 'ace.svelte'
   import { goto } from '$app/navigation'
   import { signOut } from 'firebase/auth'
@@ -16,6 +16,7 @@
     { label: 'My Attendance', icon: mdiCalendarMonth, color: 'text-green-500', href: '/attendance' },
     { label: 'Schedule', icon: mdiCalendarBlank, color: 'text-teal-500', href: '/schedule' },
     { label: 'My Profile', icon: mdiAccount, color: 'text-blue-500', href: '/profile' },
+    { label: 'Help & FAQ', icon: mdiHelpCircleOutline, color: 'text-gray-500', href: '/help' },
   ]
 
   // Apps shown only when the user holds one of the listed permissions

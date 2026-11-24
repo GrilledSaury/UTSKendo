@@ -18,6 +18,7 @@ SvelteKit (Svelte 5, client-only SPA) + Firebase (Auth, Firestore, Cloud Functio
 | `/announcements` | members | Unviewed and Viewed tabs listing title and published time; tapping one opens its content and moves it to Viewed. The home tile shows "NEW" while anything is unviewed. |
 | `/announcements/admin` | `announcement` permission | Add, edit and remove announcements, written in markdown with a preview. |
 | `/profile` | members | Your own name, second email and phone. |
+| `/help` | members | Help & FAQ and dev notes. Static: edit the `faqs` / `devNotes` arrays in `src/routes/help/+page.svelte`. |
 | `/users` | `users` or `admin` permission | Member list with search; open a member to edit their details and membership. Holders of `admin` also tick that member's permissions there. |
 
 ### How check-in works
