@@ -48,6 +48,11 @@
   const devNotes = [
     {
       date: 'Tue 24 Nov 2026',
+      title: 'Fixed: signing in from the home-screen app',
+      details: 'If you added the app to your home screen, tapping “Sign in with Google” could do nothing or never finish, because the sign-in pop-up doesn’t work there. The app now signs you in on the same screen instead. If you were stuck, close the app fully, open it again and sign in. In a normal browser, sign-in still uses a pop-up.',
+    },
+    {
+      date: 'Tue 24 Nov 2026',
       title: 'Fixed: scanning the QR code with the phone’s camera app',
       details: 'Opening a QR link from the phone’s camera app could get stuck on the scan page without opening the camera, and then showed “Saved — pending” even when online. Check-ins from a QR link are now submitted straight away. If you saw “pending” before this fix, your check-in was most likely submitted shortly afterwards. Check My Attendance, and contact Hayley if the session is missing.',
     },
