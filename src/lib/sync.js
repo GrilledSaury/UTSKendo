@@ -57,7 +57,10 @@ async function flush(uid, retryRejected) {
 
 // Try to submit everything queued for the signed-in member. `retryRejected` is for the manual button.
 export function syncNow({ retryRejected = false } = {}) {
-  const uid = currentUid
+  return queueFlush(currentUid, retryRejected)
+}
+
+function queueFlush(uid, retryRejected = false) {
   if (!uid) return Promise.resolve({})
   const run = chain.then(() => flush(uid, retryRejected))
   chain = run.catch(() => {})
@@ -68,8 +71,10 @@ export function syncNow({ retryRejected = false } = {}) {
 // Resolves to 'synced' | 'already' | 'pending' | 'rejected'; on 'rejected' the reason is in the pending store.
 export async function recordScan(uid, payload, scannedAt = new Date()) {
   await enqueue({ uid, sessionId: payload.sessionId, passcode: payload.passcode, scannedAt: scannedAt.toISOString() })
-  await refreshPending()
-  const results = await syncNow()
+  // Submit for this uid directly, not via currentUid: on a cold open from a QR link the scan
+  // can happen before the layout has finished signing in and called setSyncUser
+  const results = await queueFlush(uid)
+  if (uid !== currentUid) pending.set(await getPending(uid))
   return results[payload.sessionId] ?? 'pending'
 }
 

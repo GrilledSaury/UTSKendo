@@ -1,9 +1,9 @@
 <script>
-  import { onDestroy } from 'svelte'
+  import { onDestroy, untrack } from 'svelte'
   import jsQR from 'jsqr'
   import { AIcon } from 'ace.svelte'
   import { mdiHome, mdiCheck, mdiClose, mdiCloudUploadOutline, mdiQrcodeScan } from '@mdi/js'
-  import { goto, afterNavigate } from '$app/navigation'
+  import { goto } from '$app/navigation'
   import { page } from '$app/state'
   import { userProfile } from '$lib/stores'
   import { parseQrText, payloadFromParams, checkWindow } from '$lib/qr'
@@ -96,18 +96,22 @@
     }
   }
 
-  // Runs on first load and again whenever this page is re-opened with a different QR link
-  afterNavigate(() => {
-    stopCamera()
-    // Opened from the phone's own camera app: the QR link carries the payload
-    const params = page.url.searchParams
-    if (params.has('s')) {
-      const p = payloadFromParams(params)
-      if (p) handle(p)
-      else { payload = null; message = 'This QR code is not valid.'; status = 'invalid' }
-      return
-    }
-    startCamera()
+  // Runs when the page mounts and again whenever it is re-opened with a different QR link.
+  // (Not afterNavigate: on a cold open the layout waits for sign-in before mounting this page,
+  // so the initial navigation has already finished and afterNavigate would never fire.)
+  $effect(() => {
+    const params = new URLSearchParams(page.url.search)
+    untrack(() => {
+      stopCamera()
+      // Opened from the phone's own camera app: the QR link carries the payload
+      if (params.has('s')) {
+        const p = payloadFromParams(params)
+        if (p) handle(p)
+        else { payload = null; message = 'This QR code is not valid.'; status = 'invalid' }
+        return
+      }
+      startCamera()
+    })
   })
 
   onDestroy(stopCamera)

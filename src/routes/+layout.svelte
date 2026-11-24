@@ -53,6 +53,9 @@
         return
       }
 
+      // Sync needs only the uid, so start it before the app is shown (a QR link scans on load)
+      setSyncUser(u.uid)
+
       // Returning member: show the app straight away from the cached profile, refresh it below
       const cached = readCachedProfile(u.uid)
       if (cached) { userProfile.set(cached); enterApp() }
@@ -65,7 +68,6 @@
         // Google account details so scanning still works; nothing is written.
         if (!cached) userProfile.set({ uid: u.uid, name: u.displayName ?? u.email ?? 'Member', email: u.email ?? '', permissions: [] })
       }
-      setSyncUser(u.uid)
       enterApp()
     })
 
